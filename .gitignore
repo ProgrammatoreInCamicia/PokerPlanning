@@ -1,0 +1,24 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+## Node (se in futuro aggiungi un client Angular/JS nello stesso repo)
+node_modules/
+dist/
+
+## OS
+.DS_Store
+Thumbs.db
