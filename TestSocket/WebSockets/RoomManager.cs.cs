@@ -55,8 +55,15 @@ namespace TestSocket.WebSockets
         /// </summary>
         public void HandleSocketClosed(Room room, WebSocket socket)
         {
+            Console.WriteLine("[HandleSocketClosed] chiamato");
+
             if (!room.UserIdBySocket.TryRemove(socket, out var userId))
+            {
+                Console.WriteLine("[HandleSocketClosed] socket non trovato in UserIdBySocket");
                 return;
+            }
+
+            Console.WriteLine($"[HandleSocketClosed] userId={userId}");
 
             if (room.ParticipantsByUserId.TryGetValue(userId, out var participant))
             {
@@ -66,6 +73,7 @@ namespace TestSocket.WebSockets
                 {
                     participant.Socket = null;
                     participant.DisconnectedAt = DateTime.UtcNow;
+                    Console.WriteLine($"[HandleSocketClosed] userId={userId} marcato disconnesso");
                 }
             }
         }
