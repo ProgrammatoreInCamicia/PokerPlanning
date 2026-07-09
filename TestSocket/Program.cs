@@ -12,6 +12,19 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontendDev", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:4200",
+                "http://localhost:5200"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddSingleton<RoomManager>();
 builder.Services.AddSingleton<PokerConnectionHandler>();
 builder.Services.AddHostedService<RoomCleanupService>();
@@ -24,6 +37,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors("AllowFrontendDev");
 
 app.UseHttpsRedirection();
 
