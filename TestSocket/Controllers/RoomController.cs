@@ -18,6 +18,11 @@ namespace TestSocket.Controllers
         [HttpPost("{roomId}/importTasks")]
         public async Task<IActionResult> ImportTasksAsync(string roomId, IFormFile file)
         {
+            if (!_roomManager.TryGetRoom(roomId, out var room))
+            {
+                return NotFound($"Stanza '{roomId}' non trovata");
+            }
+
             if (file == null || file.Length == 0)
             {
                 return BadRequest("File CSV mancante");
@@ -44,11 +49,17 @@ namespace TestSocket.Controllers
                 titles.Add(title);
             }
 
-            var room = _roomManager.GetOrCreateRoom(roomId);
             _roomManager.ImportTasks(room, titles);
             await _roomManager.BroadcastRoomStateAsync(room);
 
             return Ok();
+        }
+
+        [HttpPost]
+        public IActionResult CreateRoom()
+        {
+            var room = _roomManager.CreateRoom();
+            return Ok(new { roomId = room.RoomId });
         }
     }
 }

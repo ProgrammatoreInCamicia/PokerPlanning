@@ -15,9 +15,8 @@ namespace TestSocket.WebSockets
             _roomManager = roomManager;
         }
 
-        public async Task HandleAsync(WebSocket socket, string roomId)
+        public async Task HandleAsync(WebSocket socket, Room room)
         {
-            var room = _roomManager.GetOrCreateRoom(roomId);
             var buffer = new byte[4096];
             try
             {

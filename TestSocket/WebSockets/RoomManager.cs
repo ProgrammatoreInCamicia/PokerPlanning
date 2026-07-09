@@ -13,13 +13,45 @@ namespace TestSocket.WebSockets
         private static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(5);
         // private static readonly TimeSpan GracePeriod = TimeSpan.FromSeconds(15);
 
+        private static readonly string[] Adjectives =
+        {
+            "stellare", "subacqueo", "volante", "silenzioso", "ardente", "baffuto",
+            "glaciale", "curioso", "audace", "ribelle", "elegante", "splendente"
+        };
+
+        private static readonly string[] Animals =
+        {
+            "procione", "scimmia", "gufo", "tasso", "lince",
+            "alpaca", "airone", "riccio", "orsetto", "falco"
+        };
+
         private readonly ConcurrentDictionary<string, Room> _rooms = new();
 
-        public Room GetOrCreateRoom(string roomId)
+        /// <summary>
+        /// Crea una nuova stanza con nome generato automaticamente, garantendo unicità.
+        /// </summary>
+        public Room CreateRoom()
         {
-            var room = _rooms.GetOrAdd(roomId, id => new Room { RoomId = id });
+            string roomId;
+            do
+            {
+                var animal = Animals[Random.Shared.Next(Animals.Length)];
+                var adjective = Adjectives[Random.Shared.Next(Adjectives.Length)];
+                roomId = $"{animal}-{adjective}";
+            }
+            while (_rooms.ContainsKey(roomId));
 
+            var room = new Room { RoomId = roomId };
+            _rooms[roomId] = room;
             return room;
+        }
+
+        /// <summary>
+        /// Recupera una stanza esistente. Non ne crea una nuova se non trovata.
+        /// </summary>
+        public bool TryGetRoom(string roomId, out Room room)
+        {
+            return _rooms.TryGetValue(roomId, out room!);
         }
 
         /// <summary>

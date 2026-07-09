@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using System.Net.WebSockets;
 using System.Text;
 using TestSocket.WebSockets;
@@ -32,7 +33,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.UseWebSockets();
-app.Map("ws/poker/{roomId}", async (HttpContext context, string roomId, PokerConnectionHandler handler) =>
+app.Map("ws/poker/{roomId}", async (HttpContext context, string roomId, PokerConnectionHandler handler, RoomManager roomManager) =>
 //app.Map("ws/echo", async (HttpContext context) =>
 {
     if (!context.WebSockets.IsWebSocketRequest)
@@ -41,13 +42,21 @@ app.Map("ws/poker/{roomId}", async (HttpContext context, string roomId, PokerCon
         return;
     }
 
+    if (!roomManager.TryGetRoom(roomId, out var room))
+    {
+        context.Response.StatusCode = 404;
+        await context.Response.WriteAsync("Stanza non trovata");
+        return;
+    }
+
+
     var options = new WebSocketAcceptContext
     {
         KeepAliveInterval = TimeSpan.FromSeconds(15),
     };
 
     using var socket = await context.WebSockets.AcceptWebSocketAsync(options);
-    await handler.HandleAsync(socket, roomId);
+    await handler.HandleAsync(socket, room);
 });
 
 app.Run();
