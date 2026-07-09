@@ -9,6 +9,9 @@ namespace TestSocket.WebSockets.Models
         public string ActivePreset { get; set; } = "fibonacci";
         public bool CardsRevealed { get; set; }
 
+        public List<PokerTask> Tasks { get; set; }
+        public string? ActiveTaskId { get; set; }
+
         // chiave = connessione WebSocket, così alla disconnessione sappiamo subito chi rimuovere
         public ConcurrentDictionary<string, Participant> ParticipantsByUserId { get; } = new();
         public ConcurrentDictionary<WebSocket, string> UserIdBySocket{ get; } = new();

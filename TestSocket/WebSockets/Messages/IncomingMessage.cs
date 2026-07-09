@@ -8,5 +8,6 @@
         public string? Role { get; set; }
         public string? Value { get; set; }
         public string? Preset { get; set; }
+        public string? TaskId { get; set; }
     }
 }

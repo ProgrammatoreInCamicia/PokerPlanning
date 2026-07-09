@@ -124,6 +124,22 @@ namespace TestSocket.WebSockets
                     _roomManager.ChangePreset(room, message.Preset);
                     await _roomManager.BroadcastRoomStateAsync(room);
                     break;
+                case "selectTask":
+                    if (string.IsNullOrWhiteSpace(message.TaskId))
+                    {
+                        await SendErrorAsync(socket, "taskId mancante");
+                        return;
+                    }
+                    if (_roomManager.SelectTask(room, message.TaskId))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Task non trovato");
+                    }
+
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;

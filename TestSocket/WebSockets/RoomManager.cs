@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Configuration.UserSecrets;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -112,17 +111,6 @@ namespace TestSocket.WebSockets
             return affectedRooms;
         }
 
-        //public void Leave(Room room, WebSocket socket)
-        //{
-        //    room.Participants.TryRemove(socket, out _);
-
-        //    // stanza vuota: la rimuovo
-        //    if (room.Participants.IsEmpty)
-        //    {
-        //        _rooms.TryRemove(room.RoomId, out _);
-        //    }
-        //}
-
         public bool TrySetVote(Room room, WebSocket socket, string value)
         {
             if (!room.UserIdBySocket.TryGetValue(socket, out var userId)) return false;
@@ -136,7 +124,20 @@ namespace TestSocket.WebSockets
             return true;
         }
 
-        public void Reveal(Room room) => room.CardsRevealed = true;
+        public void Reveal(Room room) 
+        {
+            room.CardsRevealed = true;
+
+            var activeTask = room.Tasks.FirstOrDefault(t => t.Id == room.ActiveTaskId);
+            if (activeTask != null)
+            {
+                activeTask.Status = PokerTaskStatus.Voted;
+                activeTask.LastVotes = room.ParticipantsByUserId.Values
+                    .Where(p => p.Role != "facilitator")
+                    .Select(p => new VoteResult { UserName = p.UserName, Value = p.Vote })
+                    .ToList();
+            }
+        } 
 
         public void Reset(Room room)
         {
@@ -162,6 +163,14 @@ namespace TestSocket.WebSockets
                 type = "roomState",
                 preset = room.ActivePreset,
                 revealed = room.CardsRevealed,
+                activeTaskId = room.ActiveTaskId,
+                tasks = room.Tasks.Select(t => new
+                {
+                    t.Id,
+                    t.Title,
+                    status = t.Status.ToString(),
+                    lastVotes = t.LastVotes
+                }),
                 participants = room.ParticipantsByUserId.Values.Select(p => new
                 {
                     p.UserName,
@@ -210,15 +219,36 @@ namespace TestSocket.WebSockets
 
                 }
             }
+        }
 
-            //if (!_rooms.TryGetValue(roomId, out var sockets)) return;
+        public void ImportTasks(Room room, IEnumerable<string> titles)
+        {
+            foreach(var title in titles)
+            {
+                room.Tasks.Add(new PokerTask
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Title = title,
+                });
+            }
+        }
 
-            //var bytes = Encoding.UTF8.GetBytes(message);
+        public bool SelectTask(Room room, string taskId)
+        {
+            var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
+            if (task == null) return false;
 
-            //foreach(var socket in sockets.Where(s => s.State == WebSocketState.Open))
-            //{
-            //    await s.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
-            //}
+            room.ActiveTaskId = taskId;
+            task.Status = PokerTaskStatus.Voting;
+            room.CardsRevealed = false;
+
+            // nuovo task si rivota 
+            foreach(var participant in room.ParticipantsByUserId.Values)
+            {
+                participant.Vote = null;
+            }
+
+            return true;
         }
     }
 }
