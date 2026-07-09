@@ -107,13 +107,27 @@ namespace TestSocket.WebSockets
                     }
                     break;
                 case "reveal":
-                    _roomManager.Reveal(room);
-                    await _roomManager.BroadcastVotesRevealedAsync(room);
-                    await _roomManager.BroadcastRoomStateAsync(room);
+                    if (_roomManager.Reveal(room, socket))
+                    {
+                        await _roomManager.BroadcastVotesRevealedAsync(room);
+                        await _roomManager.BroadcastRoomStateAsync(room);
+
+                    } else
+                    {
+                        await SendErrorAsync(socket, $"Solo il facilitator può fare questa azione");
+                        return;
+                    }
                     break;
                 case "reset":
-                    _roomManager.Reset(room);
-                    await _roomManager.BroadcastRoomStateAsync(room);
+                    if (_roomManager.Reset(room, socket))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, $"Solo il facilitator può fare questa azione");
+                        return;
+                    }
                     break;
                 case "changePreset":
                     if (string.IsNullOrWhiteSpace(message.Preset) || !CardPresets.All.ContainsKey(message.Preset))
@@ -121,8 +135,21 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, $"Preset sconosciuto: {message.Preset}");
                         return;
                     }
-                    _roomManager.ChangePreset(room, message.Preset);
-                    await _roomManager.BroadcastRoomStateAsync(room);
+                    if (!_roomManager.IsFacilitator(room, socket))
+                    {
+                        await SendErrorAsync(socket, "Solo il facilitator può cambiare il preset");
+                        return;
+                    }
+                    if (_roomManager.ChangePreset(room, message.Preset, socket))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, $"Il preset non è più disponibile");
+                        return;
+                    }
+                    
                     break;
                 case "selectTask":
                     if (string.IsNullOrWhiteSpace(message.TaskId))
@@ -130,7 +157,12 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "taskId mancante");
                         return;
                     }
-                    if (_roomManager.SelectTask(room, message.TaskId))
+                    if (!_roomManager.IsFacilitator(room, socket))
+                    {
+                        await SendErrorAsync(socket, "Solo il facilitator può selezionare un task");
+                        return;
+                    }
+                    if (_roomManager.SelectTask(room, message.TaskId, socket))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
                     }

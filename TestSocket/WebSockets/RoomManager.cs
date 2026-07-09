@@ -124,8 +124,10 @@ namespace TestSocket.WebSockets
             return true;
         }
 
-        public void Reveal(Room room) 
+        public bool Reveal(Room room, WebSocket socket) 
         {
+            if (!IsFacilitator(room, socket)) return false;
+
             room.CardsRevealed = true;
 
             var activeTask = room.Tasks.FirstOrDefault(t => t.Id == room.ActiveTaskId);
@@ -137,23 +139,29 @@ namespace TestSocket.WebSockets
                     .Select(p => new VoteResult { UserName = p.UserName, Value = p.Vote })
                     .ToList();
             }
+            return true;
         } 
 
-        public void Reset(Room room)
+        public bool Reset(Room room, WebSocket socket)
         {
+            if (!IsFacilitator(room, socket)) return false;
+
             room.CardsRevealed = false;
-            foreach(var partecipan in room.ParticipantsByUserId.Values)
+            foreach(var participant in room.ParticipantsByUserId.Values)
             {
-                partecipan.Vote = null;
+                participant.Vote = null;
             }
+
+            return true;
         }
 
-        public void ChangePreset(Room room, string preset)
+        public bool ChangePreset(Room room, string preset, WebSocket socket)
         {
-            if (CardPresets.All.ContainsKey(preset))
-            {
-                room.ActivePreset = preset;
-            }
+            if (!IsFacilitator(room, socket)) return false;
+            if (!CardPresets.All.ContainsKey(preset)) return false;
+
+            room.ActivePreset = preset;
+            return true;
         }
 
         public async Task BroadcastRoomStateAsync(Room room)
@@ -196,7 +204,7 @@ namespace TestSocket.WebSockets
             await BroadcastAsync(room, payload);
         }
 
-        public async Task BroadcastAsync(Room room, object payload)
+        private async Task BroadcastAsync(Room room, object payload)
         {
             var json = JsonSerializer.Serialize(payload);
             var bytes = Encoding.UTF8.GetBytes(json);
@@ -233,8 +241,10 @@ namespace TestSocket.WebSockets
             }
         }
 
-        public bool SelectTask(Room room, string taskId)
+        public bool SelectTask(Room room, string taskId, WebSocket socket)
         {
+            if (!IsFacilitator(room, socket)) return false;
+
             var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
             if (task == null) return false;
 
@@ -249,6 +259,13 @@ namespace TestSocket.WebSockets
             }
 
             return true;
+        }
+
+        public bool IsFacilitator(Room room, WebSocket socket)
+        {
+            if (!room.UserIdBySocket.TryGetValue(socket, out var userId)) return false;
+            if (!room.ParticipantsByUserId.TryGetValue(userId, out var participant)) return false;
+            return participant.Role == "facilitator";
         }
     }
 }
