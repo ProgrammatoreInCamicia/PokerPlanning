@@ -187,6 +187,16 @@ namespace TestSocket.WebSockets
             return true;
         }
 
+        public bool resetTasks(Room room, WebSocket socket)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+
+            room.ActiveTaskId = null;
+            room.Tasks = new List<PokerTask>();
+
+            return true;
+        }
+
         public bool ChangePreset(Room room, string preset, WebSocket socket)
         {
             if (!IsFacilitator(room, socket)) return false;
@@ -206,15 +216,15 @@ namespace TestSocket.WebSockets
                 activeTaskId = room.ActiveTaskId,
                 tasks = room.Tasks.Select(t => new
                 {
-                    t.Id,
-                    t.Title,
+                    id = t.Id,
+                    title = t.Title,
                     status = t.Status.ToString(),
                     lastVotes = t.LastVotes
                 }),
                 participants = room.ParticipantsByUserId.Values.Select(p => new
                 {
-                    p.UserName,
-                    p.Role,
+                    userName = p.UserName,
+                    role = p.Role,
                     hasVoted = p.HasVoted,
                     connected = p.IsConnected
                 })

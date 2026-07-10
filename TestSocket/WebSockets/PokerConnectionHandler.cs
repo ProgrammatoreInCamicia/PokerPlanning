@@ -171,6 +171,17 @@ namespace TestSocket.WebSockets
                     }
 
                     break;
+                case "resetTasks":
+                    if (_roomManager.resetTasks(room, socket))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, $"Solo il facilitator può fare questa azione");
+                        return;
+                    }
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;
