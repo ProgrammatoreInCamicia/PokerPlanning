@@ -168,7 +168,11 @@ namespace TestSocket.WebSockets
                 activeTask.Status = PokerTaskStatus.Voted;
                 activeTask.LastVotes = room.ParticipantsByUserId.Values
                     .Where(p => p.Role != "facilitator")
-                    .Select(p => new VoteResult { UserName = p.UserName, Value = p.Vote })
+                    .Select(p => new VoteResult { 
+                        UserName = p.UserName, 
+                        Value = p.Vote,
+                        UserId = p.UserId
+                    })
                     .ToList();
             }
             return true;
@@ -226,7 +230,8 @@ namespace TestSocket.WebSockets
                     userName = p.UserName,
                     role = p.Role,
                     hasVoted = p.HasVoted,
-                    connected = p.IsConnected
+                    connected = p.IsConnected,
+                    userId = p.UserId,
                 })
             };
 

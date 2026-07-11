@@ -18,5 +18,6 @@ public class PokerTask
 public class VoteResult
 {
     public required string UserName { get; set; }
+    public required string UserId { get; set; }
     public string? Value { get; set; }
 }
