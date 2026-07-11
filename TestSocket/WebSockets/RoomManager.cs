@@ -251,9 +251,14 @@ namespace TestSocket.WebSockets
             await BroadcastAsync(room, payload);
         }
 
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
         private async Task BroadcastAsync(Room room, object payload)
         {
-            var json = JsonSerializer.Serialize(payload);
+            var json = JsonSerializer.Serialize(payload, JsonOptions);
             var bytes = Encoding.UTF8.GetBytes(json);
 
             var sockets = room.ParticipantsByUserId.Values
