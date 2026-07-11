@@ -9,7 +9,7 @@ namespace TestSocket.WebSockets.Models
         public string ActivePreset { get; set; } = "fibonacci";
         public bool CardsRevealed { get; set; }
 
-        public List<PokerTask> Tasks { get; set; } = new List<PokerTask>();
+        public List<PokerTask> Tasks { get; } = new();
         public string? ActiveTaskId { get; set; }
 
         // chiave = connessione WebSocket, così alla disconnessione sappiamo subito chi rimuovere

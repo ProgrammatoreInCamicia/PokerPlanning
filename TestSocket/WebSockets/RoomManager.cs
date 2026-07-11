@@ -196,7 +196,7 @@ namespace TestSocket.WebSockets
             if (!IsFacilitator(room, socket)) return false;
 
             room.ActiveTaskId = null;
-            room.Tasks = new List<PokerTask>();
+            room.Tasks.Clear();
 
             return true;
         }
