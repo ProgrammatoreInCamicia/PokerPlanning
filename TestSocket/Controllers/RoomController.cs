@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TestSocket.WebSockets;
+using TestSocket.WebSockets.Models;
 
 namespace TestSocket.Controllers
 {
@@ -16,7 +17,12 @@ namespace TestSocket.Controllers
         }
 
         [HttpPost("{roomId}/importTasks")]
-        public async Task<IActionResult> ImportTasksAsync(string roomId, IFormFile file)
+        public async Task<IActionResult> ImportTasksAsync(
+            string roomId, 
+            IFormFile file,
+            [FromForm] string titleColumn,
+            [FromForm] string? priorityColumn,
+            [FromForm] string? linkColumn)
         {
             if (!_roomManager.TryGetRoom(roomId, out var room))
             {
@@ -28,31 +34,57 @@ namespace TestSocket.Controllers
                 return BadRequest("File CSV mancante");
             }
 
-            var titles = new List<string>();
-            using var reader = new StreamReader(file.OpenReadStream());
-            string? line;
-            var isFirstLine = true;
+            if (string.IsNullOrWhiteSpace(titleColumn))
+                return BadRequest("Colonna titolo non specificata");
 
-            while((line = await reader.ReadLineAsync()) != null)
+            using var reader = new StreamReader(file.OpenReadStream());
+
+            var headerLine = await reader.ReadLineAsync();
+            if (headerLine == null) return BadRequest("File CSV vuoto");
+
+            var headers = headerLine.Split(',').Select(h => h.Trim().Trim('"')).ToArray();
+
+            int titleIdx = Array.FindIndex(headers, h => h.Equals(titleColumn, StringComparison.OrdinalIgnoreCase));
+            if (titleIdx < 0) return BadRequest($"Colonna titolo '{titleColumn}' non trovata nel file");
+
+            int? priorityIdx = FindColumnIndex(headers, priorityColumn);
+            int? linkIdx = FindColumnIndex(headers, linkColumn);
+
+            var rows = new List<ImportedTaskRow>();
+            string? line;
+
+            while ((line = await reader.ReadLineAsync()) != null)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
-                var title = line.Split(',')[0].Trim().Trim('"');
+                var cells = line.Split(',').Select(c => c.Trim().Trim('"')).ToArray();
+                if (titleIdx >= cells.Length) continue;
 
-                if (isFirstLine && title.Equals("task", StringComparison.OrdinalIgnoreCase))
-                {
-                    isFirstLine = false;
-                    continue;
-                }
-                isFirstLine = false;
+                var title = cells[titleIdx];
+                if (string.IsNullOrWhiteSpace(title)) continue;
 
-                titles.Add(title);
+                var metadata = new Dictionary<string, string>();
+
+                if (priorityIdx is int pIdx && pIdx < cells.Length && !string.IsNullOrWhiteSpace(cells[pIdx]))
+                    metadata["priority"] = cells[pIdx];
+
+                if (linkIdx is int lIdx && lIdx < cells.Length && !string.IsNullOrWhiteSpace(cells[lIdx]))
+                    metadata["link"] = cells[lIdx];
+
+                rows.Add(new ImportedTaskRow { Title = title, Metadata = metadata });
             }
 
-            _roomManager.ImportTasks(room, titles);
+            _roomManager.ImportTasks(room, rows);
             await _roomManager.BroadcastRoomStateAsync(room);
 
             return Ok();
+        }
+
+        private static int? FindColumnIndex(string[] headers, string? columnName)
+        {
+            if (string.IsNullOrWhiteSpace(columnName)) return null;
+            var idx = Array.FindIndex(headers, h => h.Equals(columnName, StringComparison.OrdinalIgnoreCase));
+            return idx >= 0 ? idx : null;
         }
 
         [HttpPost]

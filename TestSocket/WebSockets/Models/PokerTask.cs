@@ -13,6 +13,13 @@ public class PokerTask
     public required string Title { get; set; }
     public PokerTaskStatus Status { get; set; } = PokerTaskStatus.Pending;
     public List <VoteResult> LastVotes { get; set; }
+    public Dictionary<string, string> Metadata { get; set; } = new();
+}
+
+public class ImportedTaskRow
+{
+    public required string Title { get; set; }
+    public Dictionary<string, string> Metadata { get; set; } = new();
 }
 
 public class VoteResult

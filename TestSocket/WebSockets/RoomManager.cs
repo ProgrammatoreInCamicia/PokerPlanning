@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -223,7 +224,8 @@ namespace TestSocket.WebSockets
                     id = t.Id,
                     title = t.Title,
                     status = t.Status.ToString(),
-                    lastVotes = t.LastVotes
+                    lastVotes = t.LastVotes,
+                    metadata = t.Metadata
                 }),
                 participants = room.ParticipantsByUserId.Values.Select(p => new
                 {
@@ -281,16 +283,34 @@ namespace TestSocket.WebSockets
             }
         }
 
-        public void ImportTasks(Room room, IEnumerable<string> titles)
+        public void ImportTasks(Room room, List<ImportedTaskRow> rows)
         {
-            foreach(var title in titles)
+            var newTasks = rows.Select(r => new PokerTask
             {
-                room.Tasks.Add(new PokerTask
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Title = title,
-                });
+                Id = Guid.NewGuid().ToString(),
+                Title = r.Title,
+                Metadata = r.Metadata
+            }).ToList();
+
+            var ordered = newTasks
+                .Select((t, idx) => (task: t, idx, priority: TryParsePriority(t)))
+                .OrderByDescending(x => x.priority.HasValue)
+                .ThenByDescending(x => x.priority ?? 0)
+                .ThenBy(x => x.idx)
+                .Select(x => x.task)
+                .ToList();
+
+            room.Tasks.AddRange(ordered);
+        }
+
+        private static double? TryParsePriority(PokerTask t)
+        {
+            if (t.Metadata.TryGetValue("priority", out var raw) &&
+                double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
+            {
+                return val;
             }
+            return null;
         }
 
         public bool SelectTask(Room room, string taskId, WebSocket socket)
