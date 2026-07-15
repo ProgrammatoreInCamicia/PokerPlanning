@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TestSocket.Utilities;
 using TestSocket.WebSockets;
 using TestSocket.WebSockets.Models;
 
@@ -14,6 +15,34 @@ namespace TestSocket.Controllers
         public RoomController(RoomManager roomManager)
         {
             _roomManager = roomManager;
+        }
+
+        [HttpPost("{roomId}/previewCsvHeaders")]
+        public async Task<IActionResult> PreviewCsvHeadersAsync(string roomId, IFormFile file)
+        {
+            if (!_roomManager.TryGetRoom(roomId, out _))
+                return NotFound($"Stanza '{roomId}' non trovata");
+
+            if (file == null || file.Length == 0)
+                return BadRequest("File CSV mancante");
+
+            using var reader = new StreamReader(file.OpenReadStream());
+            var headerLine = await reader.ReadLineAsync();
+            if (headerLine == null) return BadRequest("File CSV vuoto");
+
+            var delimiter = CsvHelper.DetectDelimiter(headerLine);
+            var headers = CsvHelper.SplitLine(headerLine, delimiter);
+
+            var suggestion = CsvHelper.SuggestMapping(headers);
+
+            return Ok(new
+            {
+                headers,
+                delimiter = delimiter.ToString(),
+                suggestedTitleColumn = suggestion.TitleColumn,
+                suggestedPriorityColumn = suggestion.PriorityColumn,
+                suggestedLinkColumn = suggestion.LinkColumn
+            });
         }
 
         [HttpPost("{roomId}/importTasks")]
@@ -42,7 +71,8 @@ namespace TestSocket.Controllers
             var headerLine = await reader.ReadLineAsync();
             if (headerLine == null) return BadRequest("File CSV vuoto");
 
-            var headers = headerLine.Split(',').Select(h => h.Trim().Trim('"')).ToArray();
+            var delimiter = CsvHelper.DetectDelimiter(headerLine);
+            var headers = CsvHelper.SplitLine(headerLine, delimiter);
 
             int titleIdx = Array.FindIndex(headers, h => h.Equals(titleColumn, StringComparison.OrdinalIgnoreCase));
             if (titleIdx < 0) return BadRequest($"Colonna titolo '{titleColumn}' non trovata nel file");
@@ -57,7 +87,7 @@ namespace TestSocket.Controllers
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
-                var cells = line.Split(',').Select(c => c.Trim().Trim('"')).ToArray();
+                var cells = CsvHelper.SplitLine(line, delimiter);
                 if (titleIdx >= cells.Length) continue;
 
                 var title = cells[titleIdx];
