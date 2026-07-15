@@ -28,8 +28,9 @@ namespace TestSocket.WebSockets
                     {
                         result = await socket.ReceiveAsync(buffer, CancellationToken.None);
                     }
-                    catch (WebSocketException)
+                    catch (Exception ex) when (ex is WebSocketException or OperationCanceledException)
                     {
+                        Console.WriteLine($"[HandleAsync] Connessione chiusa per timeout/errore: {ex.GetType().Name} - {ex.Message}");
                         break;
                     }
 

@@ -73,6 +73,7 @@ app.Map("ws/poker/{roomId}", async (HttpContext context, string roomId, PokerCon
     var options = new WebSocketAcceptContext
     {
         KeepAliveInterval = TimeSpan.FromSeconds(15),
+        KeepAliveTimeout = TimeSpan.FromSeconds(10)
     };
 
     using var socket = await context.WebSockets.AcceptWebSocketAsync(options);

@@ -276,9 +276,9 @@ namespace TestSocket.WebSockets
                 {
                     await socket.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
                 }
-                catch (WebSocketException)
+                catch (WebSocketException ex)
                 {
-
+                    Console.WriteLine($"[BroadcastAsync] Invio fallito verso un socket: {ex.Message}");
                 }
             }
         }
