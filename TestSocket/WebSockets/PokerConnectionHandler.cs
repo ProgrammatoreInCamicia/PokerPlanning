@@ -183,6 +183,14 @@ namespace TestSocket.WebSockets
                         return;
                     }
                     break;
+                case "throwEmoji":
+                    if (string.IsNullOrWhiteSpace(message.TargetUserId) || string.IsNullOrWhiteSpace(message.Emoji))
+                    {
+                        await SendErrorAsync(socket, "targetUserId ed emoji sono obbligatori");
+                        return;
+                    }
+                    await _roomManager.ThrowEmoji(room, socket, message.TargetUserId, message.Emoji);
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;

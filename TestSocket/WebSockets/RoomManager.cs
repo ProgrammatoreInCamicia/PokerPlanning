@@ -339,5 +339,23 @@ namespace TestSocket.WebSockets
             if (!room.ParticipantsByUserId.TryGetValue(userId, out var participant)) return false;
             return participant.Role == "facilitator";
         }
+
+        public async Task<bool> ThrowEmoji(Room room, WebSocket socket, string targetUserId, string emoji)
+        {
+            if (!room.UserIdBySocket.TryGetValue(socket, out var fromUserId)) return false;
+            if (!room.ParticipantsByUserId.ContainsKey(fromUserId)) return false;
+            if (!room.ParticipantsByUserId.ContainsKey(targetUserId)) return false;
+
+            var payload = new
+            {
+                type = "emojiThrown",
+                id = Guid.NewGuid().ToString(),
+                fromUserId,
+                targetUserId,
+                emoji
+            };
+            await BroadcastAsync(room, payload);
+            return true;
+        }
     }
 }

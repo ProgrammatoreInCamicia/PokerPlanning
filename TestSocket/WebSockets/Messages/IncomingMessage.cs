@@ -9,5 +9,7 @@
         public string? Value { get; set; }
         public string? Preset { get; set; }
         public string? TaskId { get; set; }
+        public string? TargetUserId { get; set; }
+        public string? Emoji { get; set; }
     }
 }
