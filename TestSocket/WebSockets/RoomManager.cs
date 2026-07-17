@@ -225,7 +225,8 @@ namespace TestSocket.WebSockets
                     title = t.Title,
                     status = t.Status.ToString(),
                     lastVotes = t.LastVotes,
-                    metadata = t.Metadata
+                    metadata = t.Metadata,
+                    finalEstimate = t.FinalEstimate
                 }),
                 participants = room.ParticipantsByUserId.Values.Select(p => new
                 {
@@ -355,6 +356,17 @@ namespace TestSocket.WebSockets
                 emoji
             };
             await BroadcastAsync(room, payload);
+            return true;
+        }
+
+        public bool ConfirmEstimate(Room room, WebSocket socket, string taskId, string finalEstimate)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+
+            var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
+            if (task == null) return false;
+
+            task.FinalEstimate = finalEstimate;
             return true;
         }
     }

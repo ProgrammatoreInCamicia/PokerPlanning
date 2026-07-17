@@ -191,6 +191,21 @@ namespace TestSocket.WebSockets
                     }
                     await _roomManager.ThrowEmoji(room, socket, message.TargetUserId, message.Emoji);
                     break;
+                case "confirmEstimate":
+                    if (string.IsNullOrWhiteSpace(message.TaskId) || string.IsNullOrWhiteSpace(message.FinalEstimate))
+                    {
+                        await SendErrorAsync(socket, "taskId e finalEstimate sono obbligatori");
+                        return;
+                    }
+                    if (_roomManager.ConfirmEstimate(room, socket, message.TaskId, message.FinalEstimate))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Solo il facilitator può confermare la stima");
+                    }
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;

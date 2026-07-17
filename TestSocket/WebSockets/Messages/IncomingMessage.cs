@@ -11,5 +11,6 @@
         public string? TaskId { get; set; }
         public string? TargetUserId { get; set; }
         public string? Emoji { get; set; }
+        public string? FinalEstimate { get; set; }
     }
 }

@@ -14,6 +14,7 @@ public class PokerTask
     public PokerTaskStatus Status { get; set; } = PokerTaskStatus.Pending;
     public List <VoteResult> LastVotes { get; set; }
     public Dictionary<string, string> Metadata { get; set; } = new();
+    public string? FinalEstimate { get; set; }
 }
 
 public class ImportedTaskRow
