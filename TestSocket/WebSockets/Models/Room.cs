@@ -11,10 +11,13 @@ namespace TestSocket.WebSockets.Models
 
         public List<PokerTask> Tasks { get; } = new();
         public string? ActiveTaskId { get; set; }
+        public bool IsLocked { get; set; }
 
         // chiave = connessione WebSocket, così alla disconnessione sappiamo subito chi rimuovere
         public ConcurrentDictionary<string, Participant> ParticipantsByUserId { get; } = new();
         public ConcurrentDictionary<WebSocket, string> UserIdBySocket{ get; } = new();
+        public ConcurrentDictionary<string, byte> KnownUserIds { get; } = new();  // mai ripulito
+        public ConcurrentDictionary<string, byte> KickedUserIds { get; } = new(); // banditi esplicitamente
 
         public DateTime? EmptySince { get; set; }
     }

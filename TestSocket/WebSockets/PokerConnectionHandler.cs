@@ -36,7 +36,17 @@ namespace TestSocket.WebSockets
 
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+                        try
+                        {
+                            if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                            {
+                                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+                            }
+                        }
+                        catch (Exception ex) when (ex is WebSocketException or InvalidOperationException)
+                        {
+                            // il socket è già stato chiuso altrove (es. da un kick concorrente): nessun problema
+                        }
                         break;
                     }
 
@@ -86,6 +96,15 @@ namespace TestSocket.WebSockets
                     if (message.Role != "voter" && message.Role != "facilitator")
                     {
                         await SendErrorAsync(socket, "role deve essere 'voter' o 'facilitator'");
+                        return;
+                    }
+                    if (!_roomManager.CanUserJoin(room, message.UserId))
+                    {
+                        var reason = room.KickedUserIds.ContainsKey(message.UserId) ? "kicked" : "locked";
+                        var payload = JsonSerializer.Serialize(new { type = "joinRejected", reason });
+                        var bytes = Encoding.UTF8.GetBytes(payload);
+                        await socket.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+                        await socket.CloseAsync(WebSocketCloseStatus.PolicyViolation, reason, CancellationToken.None);
                         return;
                     }
                     _roomManager.Join(room, socket, message.UserId, message.UserName, message.Role);
@@ -204,6 +223,32 @@ namespace TestSocket.WebSockets
                     else
                     {
                         await SendErrorAsync(socket, "Solo il facilitator può confermare la stima");
+                    }
+                    break;
+                case "kickParticipant":
+                    if (string.IsNullOrWhiteSpace(message.TargetUserId))
+                    {
+                        await SendErrorAsync(socket, "targetUserId mancante");
+                        return;
+                    }
+                    if (await _roomManager.KickParticipant(room, socket, message.TargetUserId))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Impossibile rimuovere questo partecipante");
+                    }
+                    break;
+
+                case "setRoomLocked":
+                    if (_roomManager.SetRoomLocked(room, socket, message.Locked ?? false))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Solo il facilitator può bloccare/sbloccare la stanza");
                     }
                     break;
                 default:

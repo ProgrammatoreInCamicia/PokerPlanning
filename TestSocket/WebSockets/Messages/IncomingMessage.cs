@@ -12,5 +12,6 @@
         public string? TargetUserId { get; set; }
         public string? Emoji { get; set; }
         public string? FinalEstimate { get; set; }
+        public bool? Locked { get; set; }
     }
 }

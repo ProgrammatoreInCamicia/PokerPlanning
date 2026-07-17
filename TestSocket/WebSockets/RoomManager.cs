@@ -57,6 +57,13 @@ namespace TestSocket.WebSockets
             return _rooms.TryGetValue(roomId, out room!);
         }
 
+        public bool CanUserJoin(Room room, string userId)
+        {
+            if (room.KickedUserIds.ContainsKey(userId)) return false;
+            if (room.IsLocked && !room.KnownUserIds.ContainsKey(userId)) return false;
+            return true;
+        }
+
         /// <summary>
         /// Join o riconnessione. Se lo userId esiste già nella stanza (era disconnesso),
         /// lo stato precedente (voto incluso) viene ripristinato sul nuovo socket.
@@ -79,7 +86,56 @@ namespace TestSocket.WebSockets
             }
 
             room.UserIdBySocket[socket] = userId;
+            room.KnownUserIds[userId] = 0;
             room.EmptySince = null;
+            return true;
+        }
+
+        public bool SetRoomLocked(Room room, WebSocket socket, bool locked)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+            room.IsLocked = locked;
+            return true;
+        }
+
+        public async Task<bool> KickParticipant(Room room, WebSocket socket, string targetUserId)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+            if (!room.ParticipantsByUserId.TryGetValue(targetUserId, out var target)) return false;
+            if (target.Role == "facilitator") return false;
+
+            room.KickedUserIds[targetUserId] = 0;
+
+            if (target.Socket is { State: WebSocketState.Open } socketToKick)
+            {
+                var payload = JsonSerializer.Serialize(new { type = "kicked" }, JsonOptions);
+                var bytes = Encoding.UTF8.GetBytes(payload);
+
+                try
+                {
+                    await socketToKick.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+                catch (WebSocketException)
+                {
+                    // il client si è già disconnesso da solo prima ancora di ricevere l'avviso
+                }
+
+                try
+                {
+                    if (socketToKick.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                    {
+                        await socketToKick.CloseAsync(WebSocketCloseStatus.NormalClosure, "kicked", CancellationToken.None);
+                    }
+                }
+                catch (Exception ex) when (ex is WebSocketException or InvalidOperationException)
+                {
+                    // già chiuso dal client nel frattempo: nessun problema
+                }
+
+                room.UserIdBySocket.TryRemove(socketToKick, out _);
+            }
+
+            room.ParticipantsByUserId.TryRemove(targetUserId, out _);
             return true;
         }
 
@@ -232,6 +288,7 @@ namespace TestSocket.WebSockets
                 preset = room.ActivePreset,
                 revealed = room.CardsRevealed,
                 activeTaskId = room.ActiveTaskId,
+                locked = room.IsLocked,
                 tasks = room.Tasks.Select(t => new
                 {
                     id = t.Id,
