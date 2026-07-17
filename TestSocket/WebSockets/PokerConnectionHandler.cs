@@ -240,7 +240,6 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "Impossibile rimuovere questo partecipante");
                     }
                     break;
-
                 case "setRoomLocked":
                     if (_roomManager.SetRoomLocked(room, socket, message.Locked ?? false))
                     {
@@ -249,6 +248,21 @@ namespace TestSocket.WebSockets
                     else
                     {
                         await SendErrorAsync(socket, "Solo il facilitator può bloccare/sbloccare la stanza");
+                    }
+                    break;
+                case "promoteToFacilitator":
+                    if (string.IsNullOrWhiteSpace(message.TargetUserId))
+                    {
+                        await SendErrorAsync(socket, "targetUserId mancante");
+                        return;
+                    }
+                    if (_roomManager.PromoteToFacilitator(room, socket, message.TargetUserId))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Impossibile promuovere questo partecipante");
                     }
                     break;
                 default:

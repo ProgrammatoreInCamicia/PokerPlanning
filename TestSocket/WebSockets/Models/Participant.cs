@@ -8,6 +8,7 @@ namespace TestSocket.WebSockets.Models
         public required string UserName { get; set; }
         public required string Role { get; set; } // Voter | Facilitator
         public string? Vote { get; set; }
+        public DateTime JoinedAt { get; init; } = DateTime.UtcNow;
 
         public WebSocket? Socket { get; set; }
         public DateTime? DisconnectedAt { get; set; }

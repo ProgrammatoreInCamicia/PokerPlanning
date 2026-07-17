@@ -12,7 +12,8 @@ namespace TestSocket.WebSockets
     {
 
         private static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(20);
-        private static readonly TimeSpan RoomAbandonTimeout = TimeSpan.FromHours(5); 
+        private static readonly TimeSpan RoomAbandonTimeout = TimeSpan.FromHours(5);
+        private static readonly TimeSpan FacilitatorAbsenceTimeout = TimeSpan.FromMinutes(2);
 
         // private static readonly TimeSpan GracePeriod = TimeSpan.FromSeconds(15);
 
@@ -180,6 +181,8 @@ namespace TestSocket.WebSockets
 
             foreach (var room in _rooms.Values)
             {
+                var roomChanged = false;
+
                 var staleUserIds = room.ParticipantsByUserId.Values
                     .Where(p => p.DisconnectedAt.HasValue && DateTime.UtcNow - p.DisconnectedAt.Value > GracePeriod)
                     .Select(p => p.UserId)
@@ -192,8 +195,16 @@ namespace TestSocket.WebSockets
 
                 if (staleUserIds.Length > 0)
                 {
-                    affectedRooms.Add(room);
+                    roomChanged = true;
                 }
+
+                if (AutoPromoteFacilitatorIfNeeded(room, now))
+                {
+                    roomChanged = true;
+                }
+
+                if (roomChanged)
+                    affectedRooms.Add(room);
 
                 if (room.ParticipantsByUserId.IsEmpty)
                 {
@@ -437,6 +448,44 @@ namespace TestSocket.WebSockets
             if (task == null) return false;
 
             task.FinalEstimate = finalEstimate;
+            return true;
+        }
+
+        public bool PromoteToFacilitator(Room room, WebSocket socket, string targetUserId)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+            if (!room.UserIdBySocket.TryGetValue(socket, out var currentUserId)) return false;
+            if (!room.ParticipantsByUserId.TryGetValue(currentUserId, out var currentFacilitator)) return false;
+            if (!room.ParticipantsByUserId.TryGetValue(targetUserId, out var target)) return false;
+            if (target.Role != "voter" || !target.IsConnected) return false;
+
+            currentFacilitator.Role = "voter";
+            target.Role = "facilitator";
+            target.Vote = null; // i facilitator non votano
+
+            return true;
+        }
+
+        private bool AutoPromoteFacilitatorIfNeeded(Room room, DateTime now)
+        {
+            var currentFacilitator = room.ParticipantsByUserId.Values
+                .FirstOrDefault(p => p.Role == "facilitator");
+
+            if (currentFacilitator == null) return false;
+            if (!currentFacilitator.DisconnectedAt.HasValue) return false; // è connesso, nulla da fare
+            if (now - currentFacilitator.DisconnectedAt.Value <= FacilitatorAbsenceTimeout) return false;
+
+            var candidate = room.ParticipantsByUserId.Values
+                .Where(p => p.Role == "voter" && p.IsConnected)
+                .OrderBy(p => p.JoinedAt) // il più "anziano" in stanza
+                .FirstOrDefault();
+
+            if (candidate == null) return false; // nessuno disponibile, si riprova al prossimo giro
+
+            currentFacilitator.Role = "voter";
+            candidate.Role = "facilitator";
+            candidate.Vote = null;
+
             return true;
         }
     }
