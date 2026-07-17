@@ -15,5 +15,7 @@ namespace TestSocket.WebSockets.Models
         // chiave = connessione WebSocket, così alla disconnessione sappiamo subito chi rimuovere
         public ConcurrentDictionary<string, Participant> ParticipantsByUserId { get; } = new();
         public ConcurrentDictionary<WebSocket, string> UserIdBySocket{ get; } = new();
+
+        public DateTime? EmptySince { get; set; }
     }
 }

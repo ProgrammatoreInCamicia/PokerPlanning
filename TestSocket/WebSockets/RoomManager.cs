@@ -11,7 +11,9 @@ namespace TestSocket.WebSockets
     public class RoomManager
     {
 
-        private static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(20);
+        private static readonly TimeSpan RoomAbandonTimeout = TimeSpan.FromHours(5); 
+
         // private static readonly TimeSpan GracePeriod = TimeSpan.FromSeconds(15);
 
         private static readonly string[] Adjectives =
@@ -77,6 +79,7 @@ namespace TestSocket.WebSockets
             }
 
             room.UserIdBySocket[socket] = userId;
+            room.EmptySince = null;
             return true;
         }
 
@@ -117,6 +120,7 @@ namespace TestSocket.WebSockets
         public IEnumerable<Room> CleanupStaleParticipants()
         {
             var affectedRooms = new List<Room>();
+            var now = DateTime.UtcNow;
 
             foreach (var room in _rooms.Values)
             {
@@ -137,7 +141,16 @@ namespace TestSocket.WebSockets
 
                 if (room.ParticipantsByUserId.IsEmpty)
                 {
-                    _rooms.TryRemove(room.RoomId, out _);
+                    room.EmptySince ??= now;
+
+                    if (now - room.EmptySince.Value > RoomAbandonTimeout)
+                    {
+                        _rooms.TryRemove(room.RoomId, out _);
+                    }
+                }
+                else
+                {
+                    room.EmptySince = null; // c'è ancora qualcuno, annulla il conto alla rovescia
                 }
             }
 
