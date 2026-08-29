@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 using TestSocket.Utilities;
 using TestSocket.WebSockets;
 using TestSocket.WebSockets.Models;
@@ -122,6 +123,37 @@ namespace TestSocket.Controllers
         {
             var room = _roomManager.CreateRoom();
             return Ok(new { roomId = room.RoomId });
+        }
+
+        [HttpGet("{roomId}/exportTasks")]
+        public IActionResult ExportTasks(string roomId)
+        {
+            if (!_roomManager.TryGetRoom(roomId, out var room))
+                return NotFound($"Stanza '{roomId}' non trovata");
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Titolo,Stima Finale,Priorità,Link");
+
+            foreach (var task in room.Tasks)
+            {
+                var title = EscapeCsv(task.Title);
+                var estimate = EscapeCsv(task.FinalEstimate ?? "");
+                var priority = EscapeCsv(task.Metadata.GetValueOrDefault("priority", ""));
+                var link = EscapeCsv(task.Metadata.GetValueOrDefault("link", ""));
+                sb.AppendLine($"{title},{estimate},{priority},{link}");
+            }
+
+            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            return File(bytes, "text/csv", $"{roomId}-tasks.csv");
+        }
+
+        private static string EscapeCsv(string value)
+        {
+            if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+            {
+                return $"\"{value.Replace("\"", "\"\"")}\"";
+            }
+            return value;
         }
     }
 }
