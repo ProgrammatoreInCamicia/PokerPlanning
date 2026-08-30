@@ -13,5 +13,6 @@
         public string? Emoji { get; set; }
         public string? FinalEstimate { get; set; }
         public bool? Locked { get; set; }
+        public string? TaskTitle { get; set; }
     }
 }

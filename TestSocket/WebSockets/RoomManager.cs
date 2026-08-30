@@ -475,6 +475,20 @@ namespace TestSocket.WebSockets
             return true;
         }
 
+        public bool AddTask(Room room, WebSocket socket, string title)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+            if (string.IsNullOrWhiteSpace(title)) return false;
+
+            room.Tasks.Add(new PokerTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Title = title.Trim()
+            });
+
+            return true;
+        }
+
         private bool AutoPromoteFacilitatorIfNeeded(Room room, DateTime now)
         {
             var currentFacilitator = room.ParticipantsByUserId.Values

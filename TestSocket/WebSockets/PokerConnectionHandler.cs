@@ -280,6 +280,21 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "Impossibile cambiare nome");
                     }
                     break;
+                case "addTask":
+                    if (string.IsNullOrWhiteSpace(message.TaskTitle))
+                    {
+                        await SendErrorAsync(socket, "Titolo task mancante");
+                        return;
+                    }
+                    if (_roomManager.AddTask(room, socket, message.TaskTitle))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Solo il facilitator può aggiungere task");
+                    }
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;
