@@ -466,6 +466,15 @@ namespace TestSocket.WebSockets
             return true;
         }
 
+        public bool ChangeUserName(Room room, WebSocket socket, string newUserName)
+        {
+            if (!room.UserIdBySocket.TryGetValue(socket, out var userId)) return false;
+            if (!room.ParticipantsByUserId.TryGetValue(userId, out var participant)) return false;
+
+            participant.UserName = newUserName;
+            return true;
+        }
+
         private bool AutoPromoteFacilitatorIfNeeded(Room room, DateTime now)
         {
             var currentFacilitator = room.ParticipantsByUserId.Values

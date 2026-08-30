@@ -265,6 +265,21 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "Impossibile promuovere questo partecipante");
                     }
                     break;
+                case "changeUserName":
+                    if (string.IsNullOrWhiteSpace(message.UserName))
+                    {
+                        await SendErrorAsync(socket, "userName mancante");
+                        return;
+                    }
+                    if (_roomManager.ChangeUserName(room, socket, message.UserName))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Impossibile cambiare nome");
+                    }
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;
