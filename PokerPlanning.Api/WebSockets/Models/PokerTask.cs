@@ -1,4 +1,4 @@
-﻿namespace TestSocket.WebSockets.Models;
+﻿namespace PokerPlanning.Api.WebSockets.Models;
 
 public enum PokerTaskStatus
 {
@@ -12,7 +12,7 @@ public class PokerTask
     public required string Id {  get; set; }
     public required string Title { get; set; }
     public PokerTaskStatus Status { get; set; } = PokerTaskStatus.Pending;
-    public List <VoteResult> LastVotes { get; set; }
+    public List<VoteResult> LastVotes { get; set; } = new();
     public Dictionary<string, string> Metadata { get; set; } = new();
     public string? FinalEstimate { get; set; }
 }

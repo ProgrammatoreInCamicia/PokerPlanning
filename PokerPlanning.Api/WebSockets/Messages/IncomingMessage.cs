@@ -1,4 +1,4 @@
-﻿namespace TestSocket.WebSockets.Messages
+﻿namespace PokerPlanning.Api.WebSockets.Messages
 {
     public class IncomingMessage
     {

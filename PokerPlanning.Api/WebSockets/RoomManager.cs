@@ -3,19 +3,25 @@ using System.Globalization;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using TestSocket.WebSockets.Messages;
-using TestSocket.WebSockets.Models;
+using PokerPlanning.Api.WebSockets.Messages;
+using PokerPlanning.Api.WebSockets.Models;
 
-namespace TestSocket.WebSockets
+namespace PokerPlanning.Api.WebSockets
 {
     public class RoomManager
     {
-
+        // Quanto a lungo un partecipante disconnesso resta "in stanza" col suo voto: copre
+        // refresh della pagina, cambio rete e sospensione del portatile senza perdere la sessione.
         private static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(20);
         private static readonly TimeSpan RoomAbandonTimeout = TimeSpan.FromHours(5);
         private static readonly TimeSpan FacilitatorAbsenceTimeout = TimeSpan.FromMinutes(2);
 
-        // private static readonly TimeSpan GracePeriod = TimeSpan.FromSeconds(15);
+        private readonly ILogger<RoomManager> _logger;
+
+        public RoomManager(ILogger<RoomManager> logger)
+        {
+            _logger = logger;
+        }
 
         private static readonly string[] Adjectives =
         {
@@ -147,15 +153,11 @@ namespace TestSocket.WebSockets
         /// </summary>
         public void HandleSocketClosed(Room room, WebSocket socket)
         {
-            Console.WriteLine("[HandleSocketClosed] chiamato");
-
             if (!room.UserIdBySocket.TryRemove(socket, out var userId))
             {
-                Console.WriteLine("[HandleSocketClosed] socket non trovato in UserIdBySocket");
+                // socket mai associato a un join, oppure già ripulito da un kick concorrente
                 return;
             }
-
-            Console.WriteLine($"[HandleSocketClosed] userId={userId}");
 
             if (room.ParticipantsByUserId.TryGetValue(userId, out var participant))
             {
@@ -165,7 +167,7 @@ namespace TestSocket.WebSockets
                 {
                     participant.Socket = null;
                     participant.DisconnectedAt = DateTime.UtcNow;
-                    Console.WriteLine($"[HandleSocketClosed] userId={userId} marcato disconnesso");
+                    _logger.LogDebug("Partecipante {UserId} disconnesso dalla stanza {RoomId}", userId, room.RoomId);
                 }
             }
         }
@@ -243,18 +245,21 @@ namespace TestSocket.WebSockets
 
             room.CardsRevealed = true;
 
-            var activeTask = room.Tasks.FirstOrDefault(t => t.Id == room.ActiveTaskId);
-            if (activeTask != null)
+            lock (room.TasksLock)
             {
-                activeTask.Status = PokerTaskStatus.Voted;
-                activeTask.LastVotes = room.ParticipantsByUserId.Values
-                    .Where(p => p.Role != "facilitator")
-                    .Select(p => new VoteResult { 
-                        UserName = p.UserName, 
-                        Value = p.Vote,
-                        UserId = p.UserId
-                    })
-                    .ToList();
+                var activeTask = room.Tasks.FirstOrDefault(t => t.Id == room.ActiveTaskId);
+                if (activeTask != null)
+                {
+                    activeTask.Status = PokerTaskStatus.Voted;
+                    activeTask.LastVotes = room.ParticipantsByUserId.Values
+                        .Where(p => p.Role != "facilitator")
+                        .Select(p => new VoteResult {
+                            UserName = p.UserName,
+                            Value = p.Vote,
+                            UserId = p.UserId
+                        })
+                        .ToList();
+                }
             }
             return true;
         } 
@@ -272,12 +277,15 @@ namespace TestSocket.WebSockets
             return true;
         }
 
-        public bool resetTasks(Room room, WebSocket socket)
+        public bool ResetTasks(Room room, WebSocket socket)
         {
             if (!IsFacilitator(room, socket)) return false;
 
             room.ActiveTaskId = null;
-            room.Tasks.Clear();
+            lock (room.TasksLock)
+            {
+                room.Tasks.Clear();
+            }
 
             return true;
         }
@@ -300,15 +308,7 @@ namespace TestSocket.WebSockets
                 revealed = room.CardsRevealed,
                 activeTaskId = room.ActiveTaskId,
                 locked = room.IsLocked,
-                tasks = room.Tasks.Select(t => new
-                {
-                    id = t.Id,
-                    title = t.Title,
-                    status = t.Status.ToString(),
-                    lastVotes = t.LastVotes,
-                    metadata = t.Metadata,
-                    finalEstimate = t.FinalEstimate
-                }),
+                tasks = SnapshotTasks(room),
                 participants = room.ParticipantsByUserId.Values.Select(p => new
                 {
                     userName = p.UserName,
@@ -321,6 +321,38 @@ namespace TestSocket.WebSockets
             };
 
             await BroadcastAsync(room, payload);
+        }
+
+        /// <summary>
+        /// Materializza i task in oggetti immutabili tenendo il lock, così la serializzazione
+        /// (che avviene fuori dal lock) non può incrociare una mutazione concorrente.
+        /// </summary>
+        /// <summary>
+        /// Copia difensiva della lista di task per i consumatori esterni al RoomManager
+        /// (l'export CSV), che altrimenti itererebbero una List mutata da un altro socket.
+        /// </summary>
+        public static PokerTask[] GetTasksSnapshot(Room room)
+        {
+            lock (room.TasksLock)
+            {
+                return room.Tasks.ToArray();
+            }
+        }
+
+        private static object[] SnapshotTasks(Room room)
+        {
+            lock (room.TasksLock)
+            {
+                return room.Tasks.Select(t => (object)new
+                {
+                    id = t.Id,
+                    title = t.Title,
+                    status = t.Status.ToString(),
+                    lastVotes = t.LastVotes,
+                    metadata = t.Metadata,
+                    finalEstimate = t.FinalEstimate
+                }).ToArray();
+            }
         }
 
         public async Task BroadcastVotesRevealedAsync(Room room)
@@ -361,18 +393,23 @@ namespace TestSocket.WebSockets
                 }
                 catch (WebSocketException ex)
                 {
-                    Console.WriteLine($"[BroadcastAsync] Invio fallito verso un socket: {ex.Message}");
+                    // il socket è morto tra il filtro IsConnected e la send: lo ripulirà il cleanup
+                    _logger.LogWarning(ex, "Invio fallito verso un socket della stanza {RoomId}", room.RoomId);
                 }
             }
         }
 
         public void ImportTasks(Room room, List<ImportedTaskRow> rows)
         {
+            // Qui si tronca invece di rifiutare: un export da Jira con una descrizione
+            // fuori misura non deve far fallire l'import di tutte le altre duecento righe.
             var newTasks = rows.Select(r => new PokerTask
             {
                 Id = Guid.NewGuid().ToString(),
-                Title = r.Title,
-                Metadata = r.Metadata
+                Title = FieldLimits.Truncate(r.Title, FieldLimits.TaskTitle),
+                Metadata = r.Metadata.ToDictionary(
+                    kv => kv.Key,
+                    kv => FieldLimits.Truncate(kv.Value, FieldLimits.MetadataValue))
             }).ToList();
 
             var ordered = newTasks
@@ -383,7 +420,10 @@ namespace TestSocket.WebSockets
                 .Select(x => x.task)
                 .ToList();
 
-            room.Tasks.AddRange(ordered);
+            lock (room.TasksLock)
+            {
+                room.Tasks.AddRange(ordered);
+            }
         }
 
         private static double? TryParsePriority(PokerTask t)
@@ -400,11 +440,15 @@ namespace TestSocket.WebSockets
         {
             if (!IsFacilitator(room, socket)) return false;
 
-            var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
-            if (task == null) return false;
+            lock (room.TasksLock)
+            {
+                var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
+                if (task == null) return false;
+
+                task.Status = PokerTaskStatus.Voting;
+            }
 
             room.ActiveTaskId = taskId;
-            task.Status = PokerTaskStatus.Voting;
             room.CardsRevealed = false;
 
             // nuovo task si rivota 
@@ -445,10 +489,13 @@ namespace TestSocket.WebSockets
         {
             if (!IsFacilitator(room, socket)) return false;
 
-            var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
-            if (task == null) return false;
+            lock (room.TasksLock)
+            {
+                var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
+                if (task == null) return false;
 
-            task.FinalEstimate = finalEstimate;
+                task.FinalEstimate = finalEstimate;
+            }
             return true;
         }
 
@@ -481,11 +528,14 @@ namespace TestSocket.WebSockets
             if (!IsFacilitator(room, socket)) return false;
             if (string.IsNullOrWhiteSpace(title)) return false;
 
-            room.Tasks.Add(new PokerTask
+            lock (room.TasksLock)
             {
-                Id = Guid.NewGuid().ToString(),
-                Title = title.Trim()
-            });
+                room.Tasks.Add(new PokerTask
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Title = title.Trim()
+                });
+            }
 
             return true;
         }
@@ -494,10 +544,13 @@ namespace TestSocket.WebSockets
         {
             if (!IsFacilitator(room, socket)) return false;
 
-            var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
-            if (task == null) return false;
+            lock (room.TasksLock)
+            {
+                var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
+                if (task == null) return false;
 
-            room.Tasks.Remove(task);
+                room.Tasks.Remove(task);
+            }
 
             // se il task eliminato era quello attivo, puliamo il riferimento
             if (room.ActiveTaskId == taskId)

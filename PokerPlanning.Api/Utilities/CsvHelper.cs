@@ -1,4 +1,4 @@
-﻿namespace TestSocket.Utilities
+﻿namespace PokerPlanning.Api.Utilities
 {
     public static class CsvHelper
     {

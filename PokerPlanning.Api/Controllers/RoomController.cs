@@ -1,23 +1,30 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
-using TestSocket.Utilities;
-using TestSocket.WebSockets;
-using TestSocket.WebSockets.Models;
+using PokerPlanning.Api.Utilities;
+using PokerPlanning.Api.WebSockets;
+using PokerPlanning.Api.WebSockets.Models;
 
-namespace TestSocket.Controllers
+namespace PokerPlanning.Api.Controllers
 {
+    /// <summary>
+    /// Endpoint HTTP di contorno al canale WebSocket: creazione stanza, verifica esistenza
+    /// e import/export CSV del backlog. Tutto il resto della sessione viaggia sul socket.
+    /// </summary>
     [ApiController]
-    //[Route("[controller]")]
     [Route("api/rooms")]
     public class RoomController : ControllerBase
     {
         private readonly RoomManager _roomManager;
-        
+
         public RoomController(RoomManager roomManager)
         {
             _roomManager = roomManager;
         }
 
+        /// <summary>
+        /// Legge solo l'intestazione del CSV e propone un mapping delle colonne, così il
+        /// client può far confermare l'abbinamento all'utente prima di importare davvero.
+        /// </summary>
         [HttpPost("{roomId}/previewCsvHeaders")]
         public async Task<IActionResult> PreviewCsvHeadersAsync(string roomId, IFormFile file)
         {
@@ -48,7 +55,7 @@ namespace TestSocket.Controllers
 
         [HttpPost("{roomId}/importTasks")]
         public async Task<IActionResult> ImportTasksAsync(
-            string roomId, 
+            string roomId,
             IFormFile file,
             [FromForm] string titleColumn,
             [FromForm] string? priorityColumn,
@@ -132,9 +139,9 @@ namespace TestSocket.Controllers
                 return NotFound($"Stanza '{roomId}' non trovata");
 
             var sb = new StringBuilder();
-            sb.AppendLine("Titolo,Stima Finale,Priorit�,Link");
+            sb.AppendLine("Titolo,Stima Finale,Priorità,Link");
 
-            foreach (var task in room.Tasks)
+            foreach (var task in RoomManager.GetTasksSnapshot(room))
             {
                 var title = EscapeCsv(task.Title);
                 var estimate = EscapeCsv(task.FinalEstimate ?? "");
@@ -143,7 +150,8 @@ namespace TestSocket.Controllers
                 sb.AppendLine($"{title},{estimate},{priority},{link}");
             }
 
-            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            // BOM esplicito: senza, Excel apre il CSV in ANSI e sfascia gli accenti
+            var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
             return File(bytes, "text/csv", $"{roomId}-tasks.csv");
         }
 

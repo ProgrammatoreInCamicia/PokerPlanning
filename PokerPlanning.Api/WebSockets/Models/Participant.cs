@@ -1,6 +1,6 @@
 ﻿using System.Net.WebSockets;
 
-namespace TestSocket.WebSockets.Models
+namespace PokerPlanning.Api.WebSockets.Models
 {
     public class Participant
     {

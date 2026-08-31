@@ -1,10 +1,10 @@
 ﻿using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using TestSocket.WebSockets.Messages;
-using TestSocket.WebSockets.Models;
+using PokerPlanning.Api.WebSockets.Messages;
+using PokerPlanning.Api.WebSockets.Models;
 
-namespace TestSocket.WebSockets
+namespace PokerPlanning.Api.WebSockets
 {
     public class PokerConnectionHandler
     {
@@ -98,6 +98,8 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "role deve essere 'voter' o 'facilitator'");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.UserId, FieldLimits.UserId, "userId")) return;
+                    if (await RejectIfTooLongAsync(socket, message.UserName, FieldLimits.UserName, "Il nome")) return;
                     if (!_roomManager.CanUserJoin(room, message.UserId))
                     {
                         var reason = room.KickedUserIds.ContainsKey(message.UserId) ? "kicked" : "locked";
@@ -116,6 +118,7 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "Valore voto mancante");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.Value, FieldLimits.VoteValue, "Il voto")) return;
                     if (_roomManager.TrySetVote(room, socket, message.Value))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
@@ -176,6 +179,7 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "taskId mancante");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.TaskId, FieldLimits.TaskId, "taskId")) return;
                     if (!_roomManager.IsFacilitator(room, socket))
                     {
                         await SendErrorAsync(socket, "Solo il facilitator può selezionare un task");
@@ -192,7 +196,7 @@ namespace TestSocket.WebSockets
 
                     break;
                 case "resetTasks":
-                    if (_roomManager.resetTasks(room, socket))
+                    if (_roomManager.ResetTasks(room, socket))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
                     }
@@ -208,6 +212,8 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "targetUserId ed emoji sono obbligatori");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.TargetUserId, FieldLimits.UserId, "targetUserId")) return;
+                    if (await RejectIfTooLongAsync(socket, message.Emoji, FieldLimits.Emoji, "L'emoji")) return;
                     await _roomManager.ThrowEmoji(room, socket, message.TargetUserId, message.Emoji);
                     break;
                 case "confirmEstimate":
@@ -216,6 +222,8 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "taskId e finalEstimate sono obbligatori");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.TaskId, FieldLimits.TaskId, "taskId")) return;
+                    if (await RejectIfTooLongAsync(socket, message.FinalEstimate, FieldLimits.FinalEstimate, "La stima finale")) return;
                     if (_roomManager.ConfirmEstimate(room, socket, message.TaskId, message.FinalEstimate))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
@@ -231,6 +239,7 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "targetUserId mancante");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.TargetUserId, FieldLimits.UserId, "targetUserId")) return;
                     if (await _roomManager.KickParticipant(room, socket, message.TargetUserId))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
@@ -256,6 +265,7 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "targetUserId mancante");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.TargetUserId, FieldLimits.UserId, "targetUserId")) return;
                     if (_roomManager.PromoteToFacilitator(room, socket, message.TargetUserId))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
@@ -271,6 +281,7 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "userName mancante");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.UserName, FieldLimits.UserName, "Il nome")) return;
                     if (_roomManager.ChangeUserName(room, socket, message.UserName))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
@@ -286,6 +297,7 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "Titolo task mancante");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.TaskTitle, FieldLimits.TaskTitle, "Il titolo del task")) return;
                     if (_roomManager.AddTask(room, socket, message.TaskTitle))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
@@ -301,6 +313,7 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "taskId mancante");
                         return;
                     }
+                    if (await RejectIfTooLongAsync(socket, message.TaskId, FieldLimits.TaskId, "taskId")) return;
                     if (_roomManager.DeleteTask(room, socket, message.TaskId))
                     {
                         await _roomManager.BroadcastRoomStateAsync(room);
@@ -339,6 +352,18 @@ namespace TestSocket.WebSockets
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;
             }
+        }
+
+        /// <summary>
+        /// Restituisce true (e ha già informato il client) se il campo sfora il suo tetto.
+        /// Rifiuta invece di troncare: sui messaggi interattivi un valore tagliato in
+        /// silenzio è più confondente di un errore esplicito.
+        /// </summary>
+        private static async Task<bool> RejectIfTooLongAsync(WebSocket socket, string value, int max, string fieldName)
+        {
+            if (value.Length <= max) return false;
+            await SendErrorAsync(socket, $"{fieldName} supera il limite di {max} caratteri");
+            return true;
         }
 
         private static async Task SendErrorAsync(WebSocket socket, string message)

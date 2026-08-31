@@ -1,0 +1,18 @@
+@host = http://localhost:5165
+
+### Create a new room (returns a generated roomId such as "gufo-stellare")
+POST {{host}}/api/rooms
+Accept: application/json
+
+###
+
+@roomId = gufo-stellare
+
+### Check whether a room still exists (200 / 404)
+GET {{host}}/api/rooms/{{roomId}}/exists
+
+### Export the room backlog with its final estimates as CSV
+GET {{host}}/api/rooms/{{roomId}}/exportTasks
+Accept: text/csv
+
+###

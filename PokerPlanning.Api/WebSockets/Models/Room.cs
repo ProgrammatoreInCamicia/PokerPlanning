@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Net.WebSockets;
 
-namespace TestSocket.WebSockets.Models
+namespace PokerPlanning.Api.WebSockets.Models
 {
     public class Room
     {
@@ -9,6 +9,10 @@ namespace TestSocket.WebSockets.Models
         public string ActivePreset { get; set; } = "fibonacci";
         public bool CardsRevealed { get; set; }
 
+        // L'ordine dei task è significativo (è il backlog della sessione), quindi serve una
+        // List<T> e non esiste un equivalente "concurrent": ogni lettura o scrittura di Tasks
+        // deve passare da questo lock, altrimenti due facilitator concorrenti la corrompono.
+        public object TasksLock { get; } = new();
         public List<PokerTask> Tasks { get; } = new();
         public string? ActiveTaskId { get; set; }
         public bool IsLocked { get; set; }

@@ -1,4 +1,4 @@
-﻿namespace TestSocket.WebSockets
+﻿namespace PokerPlanning.Api.WebSockets
 {
     public class RoomCleanupService : BackgroundService
     {
