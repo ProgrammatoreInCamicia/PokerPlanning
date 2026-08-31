@@ -295,6 +295,21 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "Solo il facilitator può aggiungere task");
                     }
                     break;
+                case "deleteTask":
+                    if (string.IsNullOrWhiteSpace(message.TaskId))
+                    {
+                        await SendErrorAsync(socket, "taskId mancante");
+                        return;
+                    }
+                    if (_roomManager.DeleteTask(room, socket, message.TaskId))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Impossibile eliminare questo task");
+                    }
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;

@@ -489,6 +489,29 @@ namespace TestSocket.WebSockets
             return true;
         }
 
+        public bool DeleteTask(Room room, WebSocket socket, string taskId)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+
+            var task = room.Tasks.FirstOrDefault(t => t.Id == taskId);
+            if (task == null) return false;
+
+            room.Tasks.Remove(task);
+
+            // se il task eliminato era quello attivo, puliamo il riferimento
+            if (room.ActiveTaskId == taskId)
+            {
+                room.ActiveTaskId = null;
+                room.CardsRevealed = false;
+                foreach (var participant in room.ParticipantsByUserId.Values)
+                {
+                    participant.Vote = null;
+                }
+            }
+
+            return true;
+        }
+
         private bool AutoPromoteFacilitatorIfNeeded(Room room, DateTime now)
         {
             var currentFacilitator = room.ParticipantsByUserId.Values
