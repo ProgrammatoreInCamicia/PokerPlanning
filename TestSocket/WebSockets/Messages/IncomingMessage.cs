@@ -14,5 +14,6 @@
         public string? FinalEstimate { get; set; }
         public bool? Locked { get; set; }
         public string? TaskTitle { get; set; }
+        public int? BreakMinutes { get; set; }
     }
 }

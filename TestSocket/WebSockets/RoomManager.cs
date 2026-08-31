@@ -316,7 +316,8 @@ namespace TestSocket.WebSockets
                     hasVoted = p.HasVoted,
                     connected = p.IsConnected,
                     userId = p.UserId,
-                })
+                }),
+                breakEndsAt = room.BreakEndsAt?.ToString("o"), // formato ISO 8601, es. "2026-08-19T14:30:00.000Z"
             };
 
             await BroadcastAsync(room, payload);
@@ -509,6 +510,22 @@ namespace TestSocket.WebSockets
                 }
             }
 
+            return true;
+        }
+
+        public bool StartBreak(Room room, WebSocket socket, int minutes)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+            if (minutes <= 0 || minutes > 180) return false; // guardrail contro input assurdi
+
+            room.BreakEndsAt = DateTime.UtcNow.AddMinutes(minutes);
+            return true;
+        }
+
+        public bool CancelBreak(Room room, WebSocket socket)
+        {
+            if (!IsFacilitator(room, socket)) return false;
+            room.BreakEndsAt = null;
             return true;
         }
 

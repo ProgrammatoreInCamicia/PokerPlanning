@@ -20,5 +20,6 @@ namespace TestSocket.WebSockets.Models
         public ConcurrentDictionary<string, byte> KickedUserIds { get; } = new(); // banditi esplicitamente
 
         public DateTime? EmptySince { get; set; }
+        public DateTime? BreakEndsAt { get; set; }
     }
 }

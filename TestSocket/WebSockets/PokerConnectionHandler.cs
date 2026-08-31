@@ -310,6 +310,31 @@ namespace TestSocket.WebSockets
                         await SendErrorAsync(socket, "Impossibile eliminare questo task");
                     }
                     break;
+                case "startBreak":
+                    if (message.BreakMinutes is not int minutes)
+                    {
+                        await SendErrorAsync(socket, "Durata pausa mancante");
+                        return;
+                    }
+                    if (_roomManager.StartBreak(room, socket, minutes))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Impossibile avviare la pausa");
+                    }
+                    break;
+                case "cancelBreak":
+                    if (_roomManager.CancelBreak(room, socket))
+                    {
+                        await _roomManager.BroadcastRoomStateAsync(room);
+                    }
+                    else
+                    {
+                        await SendErrorAsync(socket, "Impossibile annullare la pausa");
+                    }
+                    break;
                 default:
                     await SendErrorAsync(socket, $"Tipo messaggio sconosciuto: {message.Type}");
                     break;
