@@ -147,6 +147,12 @@ namespace TestSocket.Controllers
             return File(bytes, "text/csv", $"{roomId}-tasks.csv");
         }
 
+        [HttpGet("{roomId}/exists")]
+        public IActionResult RoomExists(string roomId)
+        {
+            return _roomManager.TryGetRoom(roomId, out _) ? Ok() : NotFound();
+        }
+
         private static string EscapeCsv(string value)
         {
             if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
